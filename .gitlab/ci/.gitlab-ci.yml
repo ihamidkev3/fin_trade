@@ -1,0 +1,123 @@
+# GitLab CI/CD Configuration for Airflow DAG Deployment
+#
+# This pipeline manages the deployment of DBT DAGs to Airflow environment.
+# 
+# Pipeline Stages:
+#   1. dbt-ci: Runs DBT CI jobs
+#   2. deploy: Deploys to Airflow server
+#
+# Deployment Process:
+#   - Validates DBT configuration
+#   - Removes existing code from Airflow
+#   - Copies new code from fin_trade repository
+#   - Sets appropriate permissions
+#   - Verifies successful deployment
+#
+# Required CI/CD Variables:
+#   AIRFLOW_SERVER: Airflow server IP/hostname
+#   SERVER_PASS: Server password
+#   SSH_PRIVATE_KEY: SSH key for server access
+
+stages:
+  - dbt-ci
+  - deploy
+
+variables:
+  AIRFLOW_PATH: "/opt/airflow/dags"
+  PROJECT_NAME: "${CI_PROJECT_PATH_SLUG}"  # This will be gitlab-group-name/fin-trade
+
+.setup_ssh: &setup_ssh |
+  eval $(ssh-agent -s)
+  echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+
+# DBT CI Jobs
+dbt-lint:
+  stage: dbt-ci
+  image: python:3.9-slim
+  before_script:
+    - pip install sqlfluff sqlfluff-templater-dbt
+  script:
+    - cd ${PROJECT_NAME}
+    - echo "Running SQL Lint checks..."
+    - sqlfluff lint .
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  tags:
+    - docker
+
+dbt-compile:
+  stage: dbt-ci
+  image: python:3.9-slim
+  before_script:
+    - pip install dbt-core dbt-sqlserver
+  script:
+    - cd ${PROJECT_NAME}
+    - echo "Running DBT validation..."
+    - dbt debug
+    - dbt compile
+  artifacts:
+    paths:
+      - ${PROJECT_NAME}/target/
+    expire_in: 1 week
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  tags:
+    - docker
+
+dbt-test:
+  stage: dbt-ci
+  image: python:3.9-slim
+  before_script:
+    - pip install dbt-core dbt-sqlserver
+  script:
+    - cd ${PROJECT_NAME}
+    - echo "Running tests on modified models..."
+    - dbt test --select state:modified
+  artifacts:
+    reports:
+      junit: ${PROJECT_NAME}/target/junit.xml
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  tags:
+    - docker
+
+# Deployment Jobs
+deploy_to_airflow:
+  stage: deploy
+  image: python:3.9-slim
+  before_script:
+    - date
+    - apt-get update && apt-get install -y openssh-client sshpass git rsync
+    - *setup_ssh
+  script:
+    - echo "Deploying to Airflow Server"
+    # Clean up old code
+    - sshpass -p ${SERVER_PASS} ssh -o StrictHostKeyChecking=no airflow@${AIRFLOW_SERVER} "
+      cd ${AIRFLOW_PATH} &&
+      sudo rm -rf ./${PROJECT_NAME}/* &&
+      mkdir -p ${PROJECT_NAME}"
+    
+    # Copy new code using rsync
+    - sshpass -p ${SERVER_PASS} rsync -avz --delete ${PROJECT_NAME}/ airflow@${AIRFLOW_SERVER}:${AIRFLOW_PATH}/${PROJECT_NAME}/
+    
+    # Set permissions
+    - sshpass -p ${SERVER_PASS} ssh -o StrictHostKeyChecking=no airflow@${AIRFLOW_SERVER} "
+      sudo chown -R airflow:airflow ${AIRFLOW_PATH}/${PROJECT_NAME} &&
+      sudo chmod -R 755 ${AIRFLOW_PATH}/${PROJECT_NAME}"
+    
+    # Verify deployment and trigger DAG refresh
+    - sshpass -p ${SERVER_PASS} ssh -o StrictHostKeyChecking=no airflow@${AIRFLOW_SERVER} "
+      ls -la ${AIRFLOW_PATH}/${PROJECT_NAME}/ &&
+      python3 -c 'import sys; sys.path.append(\"${AIRFLOW_PATH}/${PROJECT_NAME}\"); import dbt_dag' &&
+      airflow dags reserialize"
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
+      when: manual
+  environment:
+    name: production
+    url: https://${AIRFLOW_SERVER}
+  tags:
+    - docker 

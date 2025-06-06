@@ -1,0 +1,30 @@
+version: 2
+
+models:
+  - name: cust_profile
+    description: >
+      Dimension table containing customer profile information. This table stores user identifiers
+      and email addresses from financial orders. It's essential for customer identification
+      and communication.
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - user_identifier
+            - user_email
+    columns:
+      - name: account_key
+        description: "Primary key for customer profile dimension"
+        tests:
+          - unique
+          - not_null
+          - dbt_utils.sequential_values:
+              interval: 1
+      - name: user_identifier
+        description: "Unique identifier for the user"
+        tests:
+          - unique
+          - not_null
+      - name: user_email
+        description: "User's email address"
+        tests:
+          - not_null 

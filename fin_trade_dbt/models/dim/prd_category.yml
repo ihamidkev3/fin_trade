@@ -1,0 +1,53 @@
+version: 2
+
+models:
+  - name: prd_category
+    description: >
+      Dimension table containing product category hierarchy. This table organizes products
+      into a four-level hierarchy, allowing for detailed product classification and analysis.
+      It combines currency pairs, market symbols, and validity periods to create unique
+      product categories.
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - product_type
+            - category_level_3
+            - category_level_4
+      - dbt_utils.relationships_where:
+          to: ref('orders')
+          field: category_key
+          from_condition: "category_level_3 is not null"
+          to_condition: "category_key is not null"
+    columns:
+      - name: category_key
+        description: "Primary key for product category"
+        tests:
+          - unique
+          - not_null
+          - dbt_utils.sequential_values:
+              interval: 1
+      - name: product_type
+        description: "Base currency from source (base_currency)"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['GOLD', 'SILVER']
+      - name: category_level_1
+        description: "Top level of category hierarchy (base_currency)"
+        tests:
+          - not_null
+      - name: category_level_2
+        description: "Second level of category hierarchy (quote_currency)"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['USD', 'EUR', 'GBP']
+      - name: category_level_3
+        description: "Third level of category hierarchy (market_symbol)"
+        tests:
+          - not_null
+      - name: category_level_4
+        description: "Fourth level of category hierarchy (time_validity)"
+        tests:
+          - accepted_values:
+              values: ['GTC', 'IOC', 'FOK', null] 

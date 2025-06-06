@@ -1,0 +1,91 @@
+version: 2
+
+snapshots:
+  - name: product_activity_history
+    description: >
+      Type 2 Slowly Changing Dimension (SCD) snapshot that tracks changes in account product activity profiles.
+      Uses check strategy to monitor changes in the activity_profile column, creating new records only
+      when an account transitions between activity levels (Low Activity → Moderate Activity → Single Product Active → Diversified Active).
+      Each record maintains valid_from and valid_to dates to track the timeline of profile changes.
+
+    tests:
+      - dbt_utils.expression_is_true:
+          expression: "stage_valid_to is null or stage_valid_to > stage_valid_from"
+          condition: "stage_valid_from is not null"
+      - dbt_utils.sequential_values:
+          column_name: stage_valid_from
+          partition_by: account_key
+          order_by: stage_valid_from
+
+    columns:
+      - name: account_key
+        description: "Primary key from cust_profile dimension"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('cust_profile')
+              field: account_key
+
+      - name: detail_date
+        description: "Date of the activity that triggered the profile evaluation"
+        tests:
+          - not_null
+
+      - name: unique_products
+        description: "Number of distinct products traded"
+        tests:
+          - not_null
+          - dbt_utils.positive_value
+
+      - name: unique_directions
+        description: "Number of distinct trading directions"
+        tests:
+          - not_null
+          - dbt_utils.positive_value
+
+      - name: total_transactions
+        description: "Total number of transactions"
+        tests:
+          - not_null
+          - dbt_utils.positive_value
+
+      - name: total_volume
+        description: "Total trading volume"
+        tests:
+          - not_null
+
+      - name: total_fees
+        description: "Total fees charged"
+        tests:
+          - not_null
+
+      - name: avg_transaction_size
+        description: "Average size of transactions"
+        tests:
+          - not_null
+
+      - name: activity_profile
+        description: "Current activity profile of the account"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Diversified Active', 'Single Product Active', 'Moderate Activity', 'Low Activity']
+          - dbt_utils.expression_is_true:
+              expression: "activity_profile = 
+                CASE 
+                    WHEN total_transactions >= 10 and unique_products > 1 THEN 'Diversified Active'
+                    WHEN total_transactions >= 10 and unique_products = 1 THEN 'Single Product Active'
+                    WHEN total_transactions >= 5 THEN 'Moderate Activity'
+                    ELSE 'Low Activity'
+                END"
+
+      - name: activity_valid_from
+        description: "Timestamp when this activity profile became effective"
+        tests:
+          - not_null
+
+      - name: activity_valid_to
+        description: "Timestamp when this activity profile was superseded (null if current)"
+
+      - name: dbt_scd_id
+        description: "Unique identifier for each snapshot record" 

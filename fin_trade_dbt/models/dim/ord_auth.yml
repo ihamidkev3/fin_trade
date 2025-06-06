@@ -1,0 +1,34 @@
+version: 2
+
+models:
+  - name: ord_auth
+    description: >
+      Dimension table containing order status information. This table tracks the approval
+      and execution status of orders (e.g., Completed, Pending, Cancelled). It's crucial
+      for order lifecycle management and status reporting.
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - status_code
+            - status_detail
+    columns:
+      - name: approval_key
+        description: "Primary key for approval status"
+        tests:
+          - unique
+          - not_null
+          - dbt_utils.sequential_values:
+              interval: 1
+      - name: status_code
+        description: "Status code from source (status_code)"
+        tests:
+          - not_null
+          - unique
+          - accepted_values:
+              values: [0, 1, 2]
+      - name: status_detail
+        description: "Detailed description of the status"
+        tests:
+          - not_null 
+          - accepted_values:
+              values: ['Cancelled', 'Completed', 'Pending', 'Unknown']

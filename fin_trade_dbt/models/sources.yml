@@ -1,0 +1,15 @@
+version: 2
+
+sources:
+  - name: financial_data
+    description: Financial events data loaded from MySQL source
+    database: "{{ env_var('TARGET_DB_SCHEMA') }}"
+    schema: "{{ env_var('TARGET_SCHEMA') }}"
+    tables:
+      - name: staging_financial_orders
+        description: Staging table containing raw financial events data
+        tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns:
+                - record_id
+                - creation_timestamp

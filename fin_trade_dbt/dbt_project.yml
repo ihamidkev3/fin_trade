@@ -1,0 +1,61 @@
+¡name: 'fin_trade'
+version: '1.0.0'
+config-version: 2
+
+# This setting configures which "profile" dbt uses for this project.
+profile: 'fin_trade'
+
+# These configurations specify where dbt should look for different types of files.
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+clean-targets:         # directories to be removed by `dbt clean`
+  - "target"
+  - "dbt_packages"
+  - "logs"
+
+snapshots:
+  fin_trade:
+    schema: trace
+
+# Configuring models
+
+models:
+  fin_trade:
+    materialized: view
+    
+    fct:
+      materialized: incremental
+      schema: fct
+      tags: ["fact"]
+    
+    dim:
+      materialized: table
+      schema: dim
+      tags: ["dimension"]
+    
+    reports:
+      materialized: incremental
+      schema: rpt
+      tags: ["report"]
+
+vars:
+  # Global variables
+  default_schema: public
+  refresh_window_days: 7
+  
+  # Data retention settings
+  fact_retention_months: 24
+  dimension_retention_months: 36
+  report_retention_months: 12
+
+tests:
+  fin_trade:
+    schema: sch_tests
+
+      

@@ -1,0 +1,125 @@
+# GitHub Actions Workflow for Airflow DAG Deployment
+#
+# This workflow manages the deployment of DBT DAGs to Airflow environment.
+# Matches the functionality of our GitLab CI pipeline.
+#
+# Pipeline Stages:
+#   1. validate: Validates DBT project
+#   2. deploy: Deploys to Airflow server
+#
+# Deployment Process:
+#   - Validates DBT configuration
+#   - Removes existing code from Airflow
+#   - Copies new code from fin_trade repository
+#   - Sets appropriate permissions
+#   - Verifies successful deployment
+#
+# Required Secrets:
+#   AIRFLOW_SERVER: Airflow server IP/hostname
+#   SERVER_PASS: Server password
+#   SSH_PRIVATE_KEY: SSH key for server access
+
+name: Deploy Airflow DAGs
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  pull_request:
+    branches: [ main ]
+
+env:
+  AIRFLOW_PATH: "/opt/airflow/dags"
+  PROJECT_NAME: "gitlab-group-name/fin-trade"
+
+jobs:
+  dbt-ci:
+    name: DBT CI Checks
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    
+    - name: Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install dbt-core dbt-sqlserver sqlfluff sqlfluff-templater-dbt
+    
+    - name: SQL Linting
+      run: |
+        cd ${PROJECT_NAME}
+        echo "Running SQL Lint checks..."
+        sqlfluff lint .
+    
+    - name: DBT Compile
+      run: |
+        cd ${PROJECT_NAME}
+        echo "Running DBT validation..."
+        dbt debug
+        dbt compile
+    
+    - name: DBT Test
+      run: |
+        cd ${PROJECT_NAME}
+        echo "Running tests on modified models..."
+        dbt test --select state:modified
+    
+    - name: Upload Test Results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-results
+        path: ${PROJECT_NAME}/target/
+        retention-days: 7
+
+  deploy:
+    name: Deploy to Airflow
+    needs: dbt-ci
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    environment: production
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Install SSH key
+      uses: webfactory/ssh-agent@v0.7.0
+      with:
+        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y openssh-client sshpass rsync python3
+    
+    - name: Deploy to Airflow
+      env:
+        SERVER_IP: ${{ secrets.AIRFLOW_SERVER }}
+        SERVER_PASS: ${{ secrets.SERVER_PASS }}
+      run: |
+        # Clean up old code
+        sshpass -p $SERVER_PASS ssh -o StrictHostKeyChecking=no airflow@$SERVER_IP "
+          cd ${{ env.AIRFLOW_PATH }} &&
+          sudo rm -rf ./${PROJECT_NAME}/* &&
+          mkdir -p ${PROJECT_NAME}"
+        
+        # Copy new code using rsync
+        sshpass -p $SERVER_PASS rsync -avz --delete ${PROJECT_NAME}/ airflow@$SERVER_IP:${{ env.AIRFLOW_PATH }}/${PROJECT_NAME}/
+        
+        # Set permissions
+        sshpass -p $SERVER_PASS ssh -o StrictHostKeyChecking=no airflow@$SERVER_IP "
+          sudo chown -R airflow:airflow ${{ env.AIRFLOW_PATH }}/${PROJECT_NAME} &&
+          sudo chmod -R 755 ${{ env.AIRFLOW_PATH }}/${PROJECT_NAME}"
+        
+        # Verify deployment and trigger DAG refresh
+        sshpass -p $SERVER_PASS ssh -o StrictHostKeyChecking=no airflow@$SERVER_IP "
+          ls -la ${{ env.AIRFLOW_PATH }}/${PROJECT_NAME}/ &&
+          python3 -c 'import sys; sys.path.append(\"${{ env.AIRFLOW_PATH }}/${PROJECT_NAME}\"); import dbt_dag' &&
+          airflow dags reserialize" 

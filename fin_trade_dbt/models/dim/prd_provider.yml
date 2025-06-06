@@ -1,0 +1,36 @@
+version: 2
+
+models:
+  - name: prd_provider
+    description: >
+      Dimension table containing provider information. This table stores all liquidity providers
+      that can execute orders in the system. Each provider has a unique identifier and status
+      tracking. The table is used for provider management and order routing decisions.
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - provider_code
+            - provider_name
+    columns:
+      - name: provider_key
+        description: "Primary key for provider dimension"
+        tests:
+          - unique
+          - not_null
+          - dbt_utils.sequential_values:
+              interval: 1
+      - name: provider_code
+        description: "Provider identifier code (liquidity_provider)"
+        tests:
+          - not_null
+          - unique
+      - name: provider_name
+        description: "Name of the provider"
+        tests:
+          - not_null
+      - name: provider_status
+        description: "Current status of the provider (Active/Inactive/Suspended)"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Active', 'Inactive', 'Suspended'] 

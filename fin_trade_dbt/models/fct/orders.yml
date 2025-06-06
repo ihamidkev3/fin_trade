@@ -1,0 +1,148 @@
+version: 2
+
+models:
+  - name: orders
+    description: >
+      Core fact table containing all financial orders. This table tracks every order with its complete lifecycle,
+      from creation to execution. It includes all financial metrics, references to dimensions for order attributes,
+      and calculated fields for position tracking. Each record represents a unique order in the system.
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - natural_key
+            - create_date
+      - dbt_utils.expression_is_true:
+          expression: "gross_amount >= fee_amount"
+          description: "Gross amount must be greater than or equal to fee amount"
+      - dbt_utils.expression_is_true:
+          expression: "executed_amount <= base_amount"
+          description: "Executed amount cannot exceed order base amount"
+      - dbt_utils.accepted_range:
+          min_value: 0
+          field: fee_amount
+          description: "Fee amount must be non-negative"
+    columns:
+      - name: id
+        description: "Surrogate key for the order"
+        tests:
+          - unique
+          - not_null
+          - dbt_utils.sequential_values:
+              interval: 1
+              description: "IDs should be sequential without gaps"
+      - name: natural_key
+        description: "Natural key from source system (record_id)"
+        tests:
+          - unique
+          - not_null
+      - name: create_date
+        description: "Timestamp when the order was created"
+        tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: "create_date <= current_timestamp"
+              description: "Create date cannot be in the future"
+      - name: update_date
+        description: "Timestamp when the order was last modified"
+        tests:
+          - dbt_utils.expression_is_true:
+              expression: "update_date >= create_date"
+              description: "Update date must be after or equal to create date"
+      - name: user_identifier
+        description: "Unique identifier for the user who placed the order"
+        tests:
+          - not_null
+      - name: quote_amount
+        description: "Amount in quote currency for the order"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              description: "Quote amount must be positive"
+      - name: base_amount
+        description: "Amount in base currency for the order"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              description: "Base amount must be positive"
+      - name: execution_price
+        description: "Price at which the order was executed"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              description: "Execution price must be positive"
+      - name: executed_amount
+        description: "Amount that was actually executed in the order"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              description: "Executed amount must be positive"
+      - name: gross_amount
+        description: "Total quote amount that was executed (before fees)"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              description: "Gross amount must be positive"
+      - name: fee_amount
+        description: "Fee charged for the transaction"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              description: "Fee amount must be non-negative"
+      - name: provider_quoted_price
+        description: "Price quoted by the provider before execution"
+      - name: provider_fee
+        description: "Fee charged by the provider"
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              description: "Provider fee must be non-negative"
+      - name: net_position_change
+        description: "Net change in position after the order (positive for buys, negative for sells)"
+      - name: approval_key
+        description: "Foreign key to ord_auth dimension"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('ord_auth')
+              field: approval_key
+      - name: category_key
+        description: "Foreign key to prd_category dimension"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('prd_category')
+              field: category_key
+      - name: direction_key
+        description: "Foreign key to ord_side dimension"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('ord_side')
+              field: direction_key
+      - name: operation_key
+        description: "Foreign key to ord_type dimension"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('ord_type')
+              field: operation_key
+      - name: account_key
+        description: "Foreign key to cust_profile dimension"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('cust_profile')
+              field: account_key
+      - name: provider_key
+        description: "Foreign key to prd_provider dimension"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('prd_provider')
+              field: provider_key 

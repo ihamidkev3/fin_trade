@@ -1,0 +1,32 @@
+version: 2
+
+models:
+  - name: ord_side
+    description: >
+      Dimension table containing order direction types. This table defines whether an order
+      is a buy or sell, which is crucial for position calculations and trade direction analysis.
+      Each direction has a unique identifier and clear description.
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - direction_code
+            - direction_description
+    columns:
+      - name: direction_key
+        description: "Primary key for direction"
+        tests:
+          - unique
+          - not_null
+          - dbt_utils.sequential_values:
+              interval: 1
+      - name: direction_code
+        description: "Direction code from source (order_direction)"
+        tests:
+          - not_null
+          - unique
+          - accepted_values:
+              values: ['BUY', 'SELL']
+      - name: direction_description
+        description: "Human-readable description of the direction"
+        tests:
+          - not_null 

@@ -1,0 +1,32 @@
+version: 2
+
+models:
+  - name: ord_type
+    description: >
+      Dimension table containing order types. This table defines all valid order types
+      in the system (e.g., Market, Limit). Each type has a unique identifier and description
+      to help understand the order behavior and pricing mechanism.
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - operation_code
+            - operation_description
+    columns:
+      - name: operation_key
+        description: "Primary key for operation type"
+        tests:
+          - unique
+          - not_null
+          - dbt_utils.sequential_values:
+              interval: 1
+      - name: operation_code
+        description: "Order type code from source (order_type)"
+        tests:
+          - not_null
+          - unique
+          - accepted_values:
+              values: ['MARKET', 'LIMIT']
+      - name: operation_description
+        description: "Human-readable description of the order type"
+        tests:
+          - not_null 
