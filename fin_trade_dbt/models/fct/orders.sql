@@ -33,7 +33,7 @@ with src_ord as (
             when category_key=18 and [direction_key]=2 then -f.[base_amount]
         end as net_position_change,
         f.[run_key_ref]
-    FROM {{ source('staging', 'staging_financial_orders') }} f
+    FROM {{ ref('stg_orders') }} f
     inner join {{ ref('ord_auth')}} as oa on isnull(oa.[status_description],'0') = isnull(f.status_code,'0')
     inner join {{ ref('prd_category')}} as pc on isnull(pc.category_level_3,'0') = isnull(f.market_symbol,'0') 
         and isnull(pc.product_type,'0') = isnull(f.base_currency,'0')

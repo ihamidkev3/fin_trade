@@ -1,0 +1,70 @@
+version: 2
+
+sources:
+  - name: financial_data
+    description: Financial events data loaded from MySQL source
+    database: "{{ env_var('TARGET_DB_SCHEMA') }}"
+    schema: "{{ env_var('TARGET_SCHEMA') }}"
+    tables:
+      - name: staging_financial_orders
+        description: Staging table containing raw financial events data
+        loaded_at_field: creation_timestamp
+        freshness:
+          warn_after: {count: 12, period: hour}
+          error_after: {count: 24, period: hour}
+        tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns:
+                - record_id
+                - creation_timestamp
+        columns:
+          - name: record_id
+            description: Primary identifier for the record
+            tests:
+              - not_null
+          - name: creation_timestamp
+            description: Timestamp when the record was created
+            tests:
+              - not_null
+          - name: modification_timestamp
+            description: Timestamp when the record was last modified
+          - name: deletion_timestamp
+            description: Timestamp when the record was marked as deleted
+          - name: user_identifier
+            description: Unique identifier for the user
+          - name: user_email
+            description: User's email address
+          - name: status_code
+            description: Current status of the order
+          - name: quote_currency
+            description: Quote currency in the trading pair
+          - name: base_currency
+            description: Base currency in the trading pair
+          - name: quote_amount
+            description: Amount in quote currency
+          - name: base_amount
+            description: Amount in base currency
+          - name: execution_price
+            description: Price at which the order was executed
+          - name: order_direction
+            description: Buy or sell direction
+          - name: market_symbol
+            description: Trading pair symbol
+          - name: order_type
+            description: Type of order (market, limit, etc.)
+          - name: executed_amount
+            description: Amount that was actually executed
+          - name: total_quote_executed
+            description: Total quote currency amount executed
+          - name: time_validity
+            description: Time validity of the order
+          - name: fee_amount
+            description: Fee amount charged
+          - name: provider_quoted_price
+            description: Price quoted by the provider
+          - name: provider_fee
+            description: Fee charged by the provider
+          - name: liquidity_provider
+            description: Name of the liquidity provider
+          - name: provider_response
+            description: Response from the provider

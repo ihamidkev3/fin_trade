@@ -12,7 +12,7 @@ with src_profile as (
     select distinct
         f.user_identifier,
         f.user_email
-    from {{ source('staging', 'staging_financial_orders') }} f
+    from {{ ref('stg_orders') }} f
     left join {{ this }} t on t.user_identifier = f.user_identifier
     where t.account_key is null
 ),

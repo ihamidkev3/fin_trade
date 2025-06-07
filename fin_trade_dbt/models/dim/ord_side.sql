@@ -16,7 +16,7 @@ with src_side as (
             when f.order_direction = 'SELL' then 'Sell Order'
             else 'Unknown'
         end as direction_description
-    from {{ source('staging', 'staging_financial_orders') }} f
+    from {{ ref('stg_orders') }} f
     left join {{ this }} t on t.direction_code = f.order_direction
     where t.direction_code is null
 ),

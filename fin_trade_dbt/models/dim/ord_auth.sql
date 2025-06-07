@@ -17,7 +17,7 @@ with src_auth as (
             when f.status_code = 2 then 'Pending'
             else 'Unknown'
         end as status_detail
-    from {{ source('staging', 'staging_financial_orders') }} f
+    from {{ ref('stg_orders') }} f
     left join {{ this }} t on t.status_description = f.status_code
     where t.status_description is null
 ),

@@ -39,8 +39,8 @@ fin_trade/
 │   │   └── reports/       # Reporting models
 │   ├── snapshots/         # SCD Type 2 definitions
 │   ├── tests/             # Custom dbt tests
-│   └── docs/              # Project documentation
-└── scripts/               # Utility scripts
+│   ├── docs/              # Project documentation
+│   └── scripts/           # Utility scripts
 ```
 
 ## Setup and Installation

@@ -16,7 +16,7 @@ with src_type as (
             when f.order_type = 'LIMIT' then 'Limit Order'
             else 'Unknown'
         end as operation_description
-    from {{ source('staging', 'staging_financial_orders') }} f
+    from {{ ref('stg_orders') }} f
     left join {{ this }} t on t.operation_code = f.order_type
     where t.operation_code is null
 ),

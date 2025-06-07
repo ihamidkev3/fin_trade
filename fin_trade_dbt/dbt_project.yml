@@ -1,4 +1,4 @@
-¡name: 'fin_trade'
+name: 'fin_trade'
 version: '1.0.0'
 config-version: 2
 
@@ -28,6 +28,11 @@ snapshots:
 models:
   fin_trade:
     materialized: view
+    
+    staging:
+      materialized: view
+      schema: stg
+      tags: ["staging"]
     
     fct:
       materialized: incremental

@@ -14,7 +14,7 @@ with src_provider as (
         s.provider_name,
         s.is_active,
         s.insert_timestamp
-    from {{ source('staging', 'staging_financial_orders') }} s
+    from {{ ref('stg_orders') }} s
     left join {{ this }} t on t.provider_code = s.provider_code
     where t.provider_code is null
 ),

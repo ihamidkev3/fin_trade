@@ -15,7 +15,7 @@ with src_category as (
         a.quote_currency as category_level_2,
         a.market_symbol as category_level_3,
         a.time_validity as category_level_4
-    from {{ source('staging', 'staging_financial_orders') }} a
+    from {{ ref('stg_orders') }} a
     left join {{ this }} b 
     on isnull(LTRIM(RTRIM(b.product_type)),'0') = isnull(LTRIM(RTRIM(a.base_currency)),'0')
     and isnull(LTRIM(RTRIM(b.category_level_3)),'0') = isnull(LTRIM(RTRIM(a.market_symbol)),'0')
